@@ -1,10 +1,3 @@
-Here is your **properly indented and cleanly formatted README.md** with corrected Markdown structure, fixed code blocks, consistent spacing, and improved tree formatting.
-
-You can copy-paste this directly into your `README.md`.
-
----
-
-```markdown
 # Hierarchical Bayesian Malaria Infection Inference  
 CSC5341 – Probabilistic Modeling Project  
 Milestone I
@@ -13,67 +6,74 @@ Milestone I
 
 ## Project Overview
 
-This project develops a hierarchical probabilistic model for estimating latent malaria infection states under regional prevalence uncertainty. The work is contextualized within Sub-Saharan Africa, where malaria remains a major public health challenge and diagnostic uncertainty directly impacts treatment allocation.
+This project develops a hierarchical Bayesian model to estimate latent malaria infection states under regional prevalence uncertainty. The modeling framework is motivated by malaria surveillance challenges in Sub-Saharan Africa, where diagnostic uncertainty and heterogeneous regional prevalence directly affect treatment decisions and public health planning.
 
-The objective is to construct a synthetic but statistically realistic dataset that:
+The primary objective is to construct a statistically realistic synthetic dataset with known ground-truth parameters. This enables rigorous validation of probabilistic inference algorithms in later milestones.
 
-- Encodes region-level prevalence heterogeneity
-- Models latent infection states
-- Generates observable microscopy-derived features
-- Provides known ground-truth parameters for validating inference algorithms in later milestones
+Specifically, the dataset is designed to:
+
+- Capture region-level prevalence heterogeneity  
+- Model latent infection states  
+- Generate observable microscopy-derived features  
+- Preserve known generative parameters for posterior recovery validation  
 
 ---
 
-## Research Problem
+## Research Objective
 
-We aim to estimate:
+We aim to infer:
 
-- The latent infection state \( Z_{ir} \) of individual \( i \) in region \( r \)
-- The regional prevalence parameter \( \pi_r \)
-- Posterior uncertainty in infection probabilities
+- The latent infection state \( Z_{ir} \) of individual \( i \) in region \( r \)  
+- The regional prevalence parameter \( \pi_r \)  
+- Posterior uncertainty over infection probabilities  
 
-This supports decision-making in diagnostic triage and prevalence monitoring.
+This framework supports probabilistic diagnostic triage and regional prevalence monitoring under uncertainty.
 
-Dataset reference:  
+Reference dataset for calibration:  
 https://www.kaggle.com/datasets/iarunava/cell-images-for-detecting-malaria
 
 ---
 
 ## Probabilistic Model
 
-### Hierarchical Structure
+### Hierarchical Generative Structure
 
-- **Regional prevalence**
-  
-  \[
-  \pi_r \sim \text{Beta}(\alpha, \beta)
-  \]
+**1. Regional Prevalence**
 
-- **Latent infection state**
-  
-  \[
-  Z_{ir} \sim \text{Bernoulli}(\pi_r)
-  \]
+\[
+\pi_r \sim \text{Beta}(\alpha, \beta)
+\]
 
-- **Observed features (conditional independence assumption)**
-  
-  \[
-  X_{ir} \mid Z=z \sim \mathcal{N}(\mu_z, \sigma_z^2)
-  \]
+Each region has its own prevalence parameter drawn from a shared Beta prior, introducing hierarchical structure.
+
+**2. Latent Infection State**
+
+\[
+Z_{ir} \sim \text{Bernoulli}(\pi_r)
+\]
+
+Each individual’s infection state depends on their region’s prevalence.
+
+**3. Observed Features**
+
+\[
+X_{ir} \mid Z=z \sim \mathcal{N}(\mu_z, \sigma_z^2)
+\]
+
+Conditional on infection status, observed microscopy-derived features follow class-specific Gaussian distributions.
 
 Where:
 
-- \( \mu_z \) and \( \sigma_z \) are calibrated from real malaria microscopy data  
-- \( \pi_r \) varies across regions, introducing hierarchical heterogeneity  
+- \( \mu_0, \sigma_0 \) correspond to healthy cells  
+- \( \mu_1, \sigma_1 \) correspond to infected cells  
+- Regional heterogeneity is induced through variation in \( \pi_r \)
 
 ---
 
-## Kaggle Calibration
+## Kaggle-Based Calibration
 
-Feature distributions are calibrated using the Kaggle dataset:
+Feature distributions are calibrated using the NIH Malaria Cell Images Dataset:
 
-**Dataset:**  
-NIH Malaria Cell Images Dataset  
 https://www.kaggle.com/datasets/iarunava/cell-images-for-detecting-malaria
 
 From 1000 images per class, we extract:
@@ -81,123 +81,41 @@ From 1000 images per class, we extract:
 - Mean pixel intensity  
 - Pixel intensity variance  
 
-We estimate:
+We estimate empirical values:
 
-- \( \mu_0, \sigma_0 \) for healthy cells  
-- \( \mu_1, \sigma_1 \) for infected cells  
+- \( \mu_0, \sigma_0 \) for uninfected cells  
+- \( \mu_1, \sigma_1 \) for parasitized cells  
 
-These empirical statistics parameterize the Gaussian feature model in the synthetic DGP, ensuring realistic scale while preserving controlled ground truth.
+These statistics parameterize the Gaussian likelihood in the synthetic data-generating process (DGP), ensuring realistic feature scaling while maintaining controlled ground truth.
 
 ---
 
 ## Synthetic Data Generation
 
-The synthetic dataset:
+The synthetic dataset is generated as follows:
 
-- Simulates 5 regions  
-- Generates 200 individuals per region  
-- Samples region-level prevalence from a Beta distribution  
-- Draws latent infection states from \( \text{Bernoulli}(\pi_r) \)  
-- Generates calibrated Gaussian features conditional on infection  
+- Simulate 5 distinct regions  
+- Generate 200 individuals per region  
+- Sample region-level prevalence from a Beta distribution  
+- Draw latent infection states from \( \text{Bernoulli}(\pi_r) \)  
+- Generate Gaussian-distributed features conditional on infection status  
 
-### Output Dataset Structure
+### Dataset Schema
 
 | region | infection_latent | feature_1 | feature_2 |
 |--------|------------------|-----------|-----------|
 
-**Total samples:** 1000
+**Total observations:** 1000
 
 ---
 
 ## Validation
 
-The empirical regional infection rates closely approximate the true generating parameters. Minor deviations reflect expected sampling variability, confirming correct implementation of the hierarchical Bernoulli process.
+Empirical infection rates per region closely match their true generative parameters, with deviations attributable to sampling variability. This confirms correct implementation of the hierarchical Bernoulli process.
 
-Feature distributions exhibit partial class overlap, justifying the need for posterior probabilistic inference rather than deterministic thresholding.
+Feature distributions exhibit partial overlap between classes, motivating Bayesian posterior inference rather than deterministic classification thresholds.
 
 ---
 
 ## Project Structure
 
-```
-
-malaria_inference_project/
-│
-├── data/
-│   └── raw/
-│       └── cell_images/
-│
-├── notebooks/
-│   └── 01_synthetic_dgp.ipynb
-│
-├── synthetic_malaria_data.csv
-└── README.md
-
-````
-
----
-
-## Milestone I Deliverables
-
-- Hierarchical probabilistic model specification  
-- Kaggle-calibrated synthetic DGP  
-- Reproducible dataset with known ground truth  
-- Preliminary validation analysis  
-
----
-
-## Next Steps (Milestone II)
-
-- Exact posterior derivation  
-- Implementation of exact inference (Variable Elimination)  
-- Posterior recovery validation  
-- Comparative analysis of frequentist vs Bayesian approaches  
-
----
-
-## Dependencies
-
-- Python 3.x  
-- numpy  
-- pandas  
-- matplotlib  
-- pillow  
-
-Install with:
-
-```bash
-pip install numpy pandas matplotlib pillow
-````
-
----
-
-## Author
-
-Your Name
-CSC5341 – Spring 2026
-
-```
-
----
-
-### ✅ What Was Fixed
-
-- Proper indentation in project tree  
-- Correct fenced code blocks  
-- Fixed dependency install formatting  
-- Removed inconsistent spacing  
-- Standardized section headers  
-- Improved mathematical formatting clarity  
-
----
-
-If you'd like, I can also:
-
-- Make it more **publication-level polished**
-- Convert equations to pure LaTeX style for GitHub rendering
-- Add badges (Python version, license, etc.)
-- Make it CV/portfolio ready  
-- Add a proper citation section  
-
-Just tell me the level you want.
-```
