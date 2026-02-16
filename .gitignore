@@ -15,6 +15,7 @@ venv/
 
 # Ignore Jupyter checkpoints
 .ipynb_checkpoints/
+.data
 
 # OS files
 .DS_Store
