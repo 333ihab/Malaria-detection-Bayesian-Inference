@@ -1,0 +1,21 @@
+# Ignore raw Kaggle data
+data/raw/
+
+# Ignore large image files
+*.jpg
+*.jpeg
+*.png
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore virtual environment
+venv/
+
+# Ignore Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
