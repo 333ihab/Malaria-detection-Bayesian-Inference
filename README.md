@@ -119,3 +119,51 @@ Feature distributions exhibit partial overlap between classes, motivating Bayesi
 
 ## Project Structure
 
+malaria_inference_project/
+│
+├── data/
+│ └── raw/
+│ └── cell_images/
+│
+├── notebooks/
+│ └── 01_synthetic_dgp.ipynb
+│
+├── synthetic_malaria_data.csv
+└── README.md
+
+
+---
+
+## Milestone I Deliverables
+
+- Formal hierarchical probabilistic model specification  
+- Kaggle-calibrated synthetic data-generating process  
+- Reproducible dataset with known ground truth  
+- Preliminary empirical validation  
+
+---
+
+## Next Steps (Milestone II)
+
+- Closed-form posterior derivation  
+- Implementation of exact inference (Variable Elimination)  
+- Posterior parameter recovery analysis  
+- Comparative study: frequentist vs Bayesian estimation  
+
+---
+
+## Dependencies
+
+- Python 3.x  
+- numpy  
+- pandas  
+- matplotlib  
+- pillow  
+
+Install required packages:
+
+```bash
+pip install numpy pandas matplotlib pillow
+Author
+Ihab Kassimi
+CSC5341 – Spring 2026
