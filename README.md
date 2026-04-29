@@ -1,36 +1,11 @@
-# Hierarchical Bayesian Malaria Infection Inference  
-CSC5341 – Probabilistic Modeling Project  
-Milestone I
+# Hierarchical Bayesian Malaria Infection Inference
+CSC5341 – Probabilistic Modeling Project | Al Akhawayn University in Ifrane
 
 ---
 
 ## Project Overview
 
-This project develops a hierarchical Bayesian model to estimate latent malaria infection states under regional prevalence uncertainty. The modeling framework is motivated by malaria surveillance challenges in Sub-Saharan Africa, where diagnostic uncertainty and heterogeneous regional prevalence directly affect treatment decisions and public health planning.
-
-The primary objective is to construct a statistically realistic synthetic dataset with known ground-truth parameters. This enables rigorous validation of probabilistic inference algorithms in later milestones.
-
-Specifically, the dataset is designed to:
-
-- Capture region-level prevalence heterogeneity  
-- Model latent infection states  
-- Generate observable microscopy-derived features  
-- Preserve known generative parameters for posterior recovery validation  
-
----
-
-## Research Objective
-
-We aim to infer:
-
-- The latent infection state \( Z_{ir} \) of individual \( i \) in region \( r \)  
-- The regional prevalence parameter \( \pi_r \)  
-- Posterior uncertainty over infection probabilities  
-
-This framework supports probabilistic diagnostic triage and regional prevalence monitoring under uncertainty.
-
-Reference dataset for calibration:  
-https://www.kaggle.com/datasets/iarunava/cell-images-for-detecting-malaria
+This project builds a complete **Bayesian hierarchical inference pipeline** for estimating malaria infection prevalence across geographic regions from cell-image features. The modelling problem mirrors a real clinical context: given microscopy image statistics from patient blood samples, infer (a) the latent infection status of each individual and (b) the regional prevalence of malaria, while propagating full posterior uncertainty rather than committing to point estimates.
 
 ---
 
@@ -38,132 +13,96 @@ https://www.kaggle.com/datasets/iarunava/cell-images-for-detecting-malaria
 
 ### Hierarchical Generative Structure
 
-**1. Regional Prevalence**
+$$\pi_r \sim \text{Beta}(\alpha, \beta), \quad r = 0, \ldots, 4$$
 
-\[
-\pi_r \sim \text{Beta}(\alpha, \beta)
-\]
+$$Z_i \mid \pi_{r(i)} \sim \text{Bernoulli}(\pi_{r(i)}), \quad i = 1, \ldots, n$$
 
-Each region has its own prevalence parameter drawn from a shared Beta prior, introducing hierarchical structure.
-
-**2. Latent Infection State**
-
-\[
-Z_{ir} \sim \text{Bernoulli}(\pi_r)
-\]
-
-Each individual’s infection state depends on their region’s prevalence.
-
-**3. Observed Features**
-
-\[
-X_{ir} \mid Z=z \sim \mathcal{N}(\mu_z, \sigma_z^2)
-\]
-
-Conditional on infection status, observed microscopy-derived features follow class-specific Gaussian distributions.
+$$\mathbf{X}_i \mid Z_i \sim \mathcal{N}(\boldsymbol{\mu}_{Z_i},\; \text{diag}(\boldsymbol{\sigma}_{Z_i}^2))$$
 
 Where:
-
-- \( \mu_0, \sigma_0 \) correspond to healthy cells  
-- \( \mu_1, \sigma_1 \) correspond to infected cells  
-- Regional heterogeneity is induced through variation in \( \pi_r \)
-
----
-
-## Kaggle-Based Calibration
-
-Feature distributions are calibrated using the NIH Malaria Cell Images Dataset:
-
-https://www.kaggle.com/datasets/iarunava/cell-images-for-detecting-malaria
-
-From 1000 images per class, we extract:
-
-- Mean pixel intensity  
-- Pixel intensity variance  
-
-We estimate empirical values:
-
-- \( \mu_0, \sigma_0 \) for uninfected cells  
-- \( \mu_1, \sigma_1 \) for parasitized cells  
-
-These statistics parameterize the Gaussian likelihood in the synthetic data-generating process (DGP), ensuring realistic feature scaling while maintaining controlled ground truth.
+- $\pi_r$ is the region-level malaria prevalence
+- $Z_i = 1$ indicates infection
+- $\mathbf{X}_i \in \mathbb{R}^2$ contains microscopy-derived image features
+- Feature distributions are calibrated to the [NIH Malaria Cell Images Dataset](https://www.kaggle.com/datasets/iarunava/cell-images-for-detecting-malaria)
 
 ---
 
-## Synthetic Data Generation
+## Milestones
 
-The synthetic dataset is generated as follows:
-
-- Simulate 5 distinct regions  
-- Generate 200 individuals per region  
-- Sample region-level prevalence from a Beta distribution  
-- Draw latent infection states from \( \text{Bernoulli}(\pi_r) \)  
-- Generate Gaussian-distributed features conditional on infection status  
-
-### Dataset Schema
-
-| region | infection_latent | feature_1 | feature_2 |
-|--------|------------------|-----------|-----------|
-
-**Total observations:** 1000
+| # | Title | Key Contribution |
+|---|-------|-----------------|
+| I | Synthetic Data Generating Process | Kaggle-calibrated hierarchical DGP, 1,000-patient synthetic dataset |
+| II | Coordinate-Ascent Variational Inference (CAVI) | Closed-form ELBO + mean-field approximate posterior |
+| III | Gibbs Sampling | Vectorised multi-chain MCMC; asymptotically exact posterior |
+| IV-C1 | Inference Diagnostics | ESS, split-$\hat{R}$, ELBO tightness, VI vs MCMC fidelity |
+| IV-C2 | Variational EM Learning | Joint parameter learning; soft-assignment M-step |
+| V | Critical Synthesis & Research Proposal | Information-theoretic analysis; amortised hierarchical VAE proposal |
 
 ---
 
-## Validation
+## Key Results
 
-Empirical infection rates per region closely match their true generative parameters, with deviations attributable to sampling variability. This confirms correct implementation of the hierarchical Bernoulli process.
-
-Feature distributions exhibit partial overlap between classes, motivating Bayesian posterior inference rather than deterministic classification thresholds.
+| Engine | Status | Key Metric |
+|--------|--------|------------|
+| CAVI | Converged (60 iter) | ELBO gap = 1.789 nats (0.35%); 0.9997 correlation with MCMC |
+| Gibbs (4 chains) | Fully converged | Min ESS = 431; Max $\hat{R}$ = 1.013 |
+| Variational EM | 30 outer iterations | $\mu_0$ error = 1.51 units; $\mu_1$ error = 2.69 units |
 
 ---
 
 ## Project Structure
 
+```
 malaria_inference_project/
-│
-├── data/
-│ └── raw/
-│ └── cell_images/
-│
+├── src/
+│   ├── model_specification.py   # MalariaModelConfig, data loader
+│   ├── exact_inference.py       # coordinate_ascent_vi(), compute_elbo()
+│   ├── gibbs_sampler.py         # GibbsSampler (vectorised), run_multiple_chains()
+│   ├── diagnostics.py           # ESS, R-hat, VI tightness, VI vs MCMC comparison
+│   └── learning.py              # VariationalEMLearner (VI E-step + weighted MLE M-step)
 ├── notebooks/
-│ └── 01_synthetic_dgp.ipynb
-│
+│   ├── 01_synthetic_dgp.ipynb        # Milestone I
+│   ├── 02_exact_inference.ipynb      # Milestone II
+│   ├── 03_gibbs_sampler.ipynb        # Milestone III
+│   ├── 04_diagnostics.ipynb          # Milestone IV-C1
+│   ├── 05_model_extension.ipynb      # Milestone IV-C2
+│   └── 06_synthesis.ipynb            # Milestone V
+├── reports/
+│   ├── full_project_report.md        # Complete technical report
+│   └── milestone_v_report.md         # Milestone V standalone
 ├── synthetic_malaria_data.csv
 └── README.md
-
-
----
-
-## Milestone I Deliverables
-
-- Formal hierarchical probabilistic model specification  
-- Kaggle-calibrated synthetic data-generating process  
-- Reproducible dataset with known ground truth  
-- Preliminary empirical validation  
+```
 
 ---
 
-## Next Steps (Milestone II)
+## Research Proposal (Milestone V)
 
-- Closed-form posterior derivation  
-- Implementation of exact inference (Variable Elimination)  
-- Posterior parameter recovery analysis  
-- Comparative study: frequentist vs Bayesian estimation  
+**Amortised Hierarchical Inference for Neural-Symbolic Malaria Surveillance**
+
+The current pipeline is transductive — CAVI must be re-run per dataset. The proposed architecture replaces CAVI with a hierarchical VAE:
+
+1. **CNN encoder** $f_\phi$ learns $q_\phi(Z_i \mid \mathbf{X}_i)$ directly from raw cell images.
+2. **Structured posterior** preserves Beta-Bernoulli conjugacy for region-level aggregation.
+3. **End-to-end training** via Gumbel-softmax reparameterisation.
+
+Target: $>1000\times$ inference speedup over CAVI with equivalent posterior accuracy.
 
 ---
 
 ## Dependencies
 
-- Python 3.x  
-- numpy  
-- pandas  
-- matplotlib  
-- pillow  
-
-Install required packages:
-
 ```bash
-pip install numpy pandas matplotlib pillow
-Author
-Ihab Kassimi
-CSC5341 – Spring 2026
+pip install numpy pandas matplotlib scipy pillow
+```
+
+- Python 3.x
+- numpy, pandas, matplotlib, scipy, pillow
+
+---
+
+## Author
+
+**Ihab Kassimi**  
+CSC5341 – Inferential Statistics, Spring 2026  
+Al Akhawayn University in Ifrane

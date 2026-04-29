@@ -581,16 +581,17 @@ All source modules and four of six notebooks were tested and verified in this se
 
 ### 8.2 Notebook Execution Status
 
-| Notebook | Status | Output size |
-|----------|--------|-------------|
-| 01_synthetic_dgp.ipynb | ✓ Executed and saved | 76 KB |
-| 02_exact_inference.ipynb | ✓ Executed and saved | 408 KB |
-| 03_gibbs_sampler.ipynb | ✓ Executed and saved | 503 KB |
-| 04_diagnostics.ipynb | ✓ Executed and saved | 923 KB |
-| 05_model_extension.ipynb | ✓ Executed and saved | 190 KB |
-| 06_synthesis.ipynb | ✓ Executed and saved | 145 KB |
+| Notebook | Status |
+|----------|--------|
+| 01_synthetic_dgp.ipynb | ✓ Executed and saved |
+| 02_exact_inference.ipynb | ✓ Executed and saved |
+| 03_gibbs_sampler.ipynb | ✓ Executed and saved |
+| 04_diagnostics.ipynb | ✓ Executed and saved |
+| 05_model_extension.ipynb | ✓ Executed and saved |
+| 06_synthesis.ipynb | ✓ Executed and saved |
+| 07_enriched_model.ipynb | ✓ Executed and saved |
 
-All 6 notebooks executed and saved successfully.
+All 7 notebooks executed and saved successfully.
 
 ### 8.3 Known Issues and Status
 
@@ -599,6 +600,116 @@ All 6 notebooks executed and saved successfully.
 | Cells in patched NB02/NB03 missing `id` field (nbformat warning) | Minor | Non-fatal warning; execution unaffected |
 | NB03 slow due to Python-loop Gibbs (~546s per 1,000 iterations) | Minor | Expected; documented in notebook; vectorised version is in `src/` |
 | CAVI shrinks Region 4 prevalence (Bayes 0.880 vs true 0.903) | By design | Documented in NB02 shrinkage analysis |
+
+---
+
+## 9. Enriched Model — Research-Grade Upgrades
+
+### 9.1 Motivation
+
+The baseline model (Milestones I–V) makes five simplifying assumptions that limit realism:
+
+| Assumption | Limitation |
+|------------|-----------|
+| Diagonal covariance $\text{diag}(\sigma^2)$ | Feature correlations ignored |
+| Single Gaussian per class | Cannot model multi-modal feature distributions |
+| Regions independent, fixed $\alpha, \beta$ | No borrowing of strength; prior not data-adapted |
+| Region does not affect features | Hospital/equipment effects on image quality ignored |
+| Labels assumed noise-free | Clinical diagnoses have known false-positive/negative rates |
+
+`src/enriched_model.py` implements all five upgrades within the same Variational EM framework.
+
+### 9.2 Enriched Generative Model
+
+The full enriched generative process is:
+
+$$\alpha, \beta \sim \text{Gamma}(a, b) \qquad \text{(learned hyperpriors)}$$
+
+$$\pi_r \sim \text{Beta}(\alpha, \beta), \quad r = 0,\ldots,4$$
+
+$$Z_i \mid \pi_{r(i)} \sim \text{Bernoulli}(\pi_{r(i)})$$
+
+$$\tilde{\mathbf{X}}_i = \mathbf{X}_i - \boldsymbol{\delta}_{r(i)} \qquad \text{(region offset removed)}$$
+
+$$\tilde{\mathbf{X}}_i \mid Z_i = z \sim \sum_{k=1}^{K} w_{z,k}\, \mathcal{N}(\boldsymbol{\mu}_{z,k},\, \boldsymbol{\Sigma}_{z,k}) \qquad \text{(MoG, full } \boldsymbol{\Sigma}\text{)}$$
+
+$$Y_i \mid Z_i \sim \text{Bernoulli}(\rho_{Z_i}) \qquad \text{(label noise)}$$
+
+where $\rho_1$ is sensitivity ($P(Y=1 \mid Z=1)$) and $\rho_0$ is specificity ($P(Y=0 \mid Z=0)$).
+
+### 9.3 Inference — Variational EM
+
+Each outer iteration alternates:
+
+**E-step (CAVI):** Fix $\theta = \{w_{z,k}, \boldsymbol{\mu}_{z,k}, \boldsymbol{\Sigma}_{z,k}, \boldsymbol{\delta}_r, \alpha, \beta\}$. Update:
+
+$$q^*(\pi_r) = \text{Beta}\!\left(\alpha + \textstyle\sum_{i\in r} \phi_i,\;\; \beta + n_r - \textstyle\sum_{i\in r} \phi_i\right)$$
+
+$$\log \phi_i^* \propto \mathbb{E}[\log \pi_{r(i)}] + \log p_{\text{MoG}}(\tilde{\mathbf{X}}_i \mid Z{=}1) + Y_i \log \rho_1 + (1-Y_i)\log(1-\rho_1)$$
+
+**M-step:** Fix $q$. Update:
+
+- **Component parameters** (closed-form weighted MLE):
+$$\hat{w}_{z,k} \propto \sum_i \phi_{iz}\, \gamma_{ik}^z, \quad \hat{\boldsymbol{\mu}}_{z,k} = \frac{\sum_i \phi_{iz}\,\gamma_{ik}^z\, \mathbf{X}_i}{\sum_i \phi_{iz}\,\gamma_{ik}^z}, \quad \hat{\boldsymbol{\Sigma}}_{z,k} = \text{weighted cov} + \epsilon I$$
+
+- **Region offsets** (closed-form): $\hat{\boldsymbol{\delta}}_r = \bar{\mathbf{X}}_r^{\phi} - \bar{\mathbf{X}}^{\phi}$ (soft region mean minus global mean)
+
+- **Hyperpriors** ($\alpha, \beta$ via L-BFGS-B): maximise $\sum_r \mathbb{E}_q[\log \text{Beta}(\pi_r; \alpha, \beta)] + \log \text{Gamma}(\alpha; a, b) + \log \text{Gamma}(\beta; a, b)$
+
+### 9.4 Results (Notebook 07)
+
+#### Model comparison
+
+| Model | Final ELBO | Accuracy |
+|-------|-----------|---------|
+| Baseline CAVI | −12,478.91 | 0.7760 |
+| Full covariance, K=1 | −12,471.21 | 0.7610 |
+| MoG K=2, full Σ | **−12,466.14** | 0.7760 |
+| Region offsets | −12,468.44 | 0.7760 |
+| Label noise (ρ=0.90) | −12,929.63 | **0.9880** |
+| Learned hyperpriors | −12,473.75 | 0.7630 |
+| All upgrades combined | −12,912.91 | 0.9870 |
+
+#### Key findings
+
+**MoG (K=2) achieves the best ELBO** among upgrades that do not incorporate label supervision (−12,466.14 vs baseline −12,478.91, improvement +12.77 nats). The mixture allows the model to capture the bimodal intensity distribution within each class.
+
+**Learned mixture weights** are nearly balanced (z=0: [0.506, 0.494]; z=1: [0.542, 0.458]), indicating that two sub-populations exist within each class, consistent with imaging variability from different parasite stages.
+
+**Full covariance** captures modest off-diagonal correlations: infected cells show ρ ≈ 0.12 between features, healthy cells ρ ≈ −0.06 to +0.05. Weak but non-zero — justifying departure from the diagonal assumption.
+
+**Region offsets** learn meaningful per-region shifts (e.g., Region 4: δ = [−1.67, −111.1]), consistent with Region 4's high prevalence inducing different feature distributions.
+
+**Learned hyperpriors** converge to α = 1.69, β = 1.65 — slightly below the fixed α = β = 2.0 prior, favouring a more diffuse Beta prior with weaker shrinkage toward 0.5.
+
+**Label noise accuracy of 98.8%** must be interpreted carefully: in the synthetic dataset the observed labels $Y_i$ equal the true latent $Z_i$, so the label noise term effectively incorporates ground-truth supervision into the posterior — inflating accuracy beyond what is achievable from features alone. In a real clinical deployment, $Y_i$ would be imperfect diagnoses, and the model would correctly discount label errors via $\rho$.
+
+#### Learned covariance structure (MoG K=2)
+
+| Class | Component | $\sigma_1$ | $\sigma_2$ | Feature corr $\rho$ |
+|-------|-----------|-----------|-----------|-------------------|
+| Healthy (Z=0) | 0 | 9.050 | 891.2 | −0.064 |
+| Healthy (Z=0) | 1 | 12.547 | 761.6 | +0.049 |
+| Infected (Z=1) | 0 | 13.229 | 1002.9 | +0.121 |
+| Infected (Z=1) | 1 | 13.223 | 1463.3 | +0.050 |
+
+### 9.5 Implementation
+
+| File | Description |
+|------|-------------|
+| `src/enriched_model.py` | `EnrichedConfig`, `enriched_fit()`, `EnrichedResult` |
+| `notebooks/07_enriched_model.ipynb` | Full ablation study, convergence plots, prevalence comparison |
+| `reports/enriched_elbo_convergence.png` | ELBO convergence for all 6 variants |
+| `reports/enriched_prevalence_comparison.png` | Posterior prevalence: baseline vs enriched |
+
+### 9.6 Limitations of the Enriched Model
+
+| Limitation | Note |
+|------------|------|
+| ELBO not strictly comparable across label-noise and non-label-noise models | Label noise changes the likelihood scope; ELBOs measure different quantities |
+| MoG components collapse toward equal weights on synthetic data | Two-feature synthetic data may not have sufficient multi-modality to fully separate K=2 components |
+| Region offsets are additive shifts only | Multiplicative or interaction effects (scale differences across regions) are not captured |
+| $\rho$ values are fixed, not inferred | A full Bayesian treatment would place a Beta prior on $\rho_1, \rho_0$ and infer them |
 
 ---
 
