@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(python _fix_notebooks.py)",
-      "Bash(python -c ':*)"
-    ]
-  }
-}
